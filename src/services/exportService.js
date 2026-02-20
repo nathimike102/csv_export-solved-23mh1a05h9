@@ -80,6 +80,9 @@ class ExportService {
         return;
       }
 
+      // Start transaction for cursor
+      await client.query('BEGIN');
+
       const cursorName = `export_cursor_${exportId.replace(/-/g, '_')}`;
       await client.query(`DECLARE ${cursorName} CURSOR FOR ${query}`, params);
 
@@ -97,13 +100,13 @@ class ExportService {
         while (true) {
           if (jobQueue.getJob(exportId)?.status === 'cancelled') {
             await client.query(`CLOSE ${cursorName}`);
+            await client.query('ROLLBACK');
             throw new Error('Export cancelled by user');
           }
 
           const result = await client.query(`FETCH ${BATCH_SIZE} FROM ${cursorName}`);
 
           if (result.rows.length === 0) {
-            csvStringifier.end();
             break;
           }
 
@@ -122,6 +125,12 @@ class ExportService {
           logger.debug(`Export ${exportId} progress: ${processedRows}/${totalRows}`);
         }
 
+        // Close cursor and commit transaction
+        await client.query(`CLOSE ${cursorName}`);
+        await client.query('COMMIT');
+
+        // End the CSV stream and wait for file to be written
+        csvStringifier.end();
         await new Promise((resolve, reject) => {
           writeStream.on('finish', resolve);
           writeStream.on('error', reject);
@@ -135,6 +144,11 @@ class ExportService {
           await client.query(`CLOSE ${cursorName}`);
         } catch (e) {
           logger.debug('Cursor close error:', e);
+        }
+        try {
+          await client.query('ROLLBACK');
+        } catch (e) {
+          logger.debug('Rollback error:', e);
         }
         throw err;
       }
