@@ -1,5 +1,5 @@
 const express = require('express');
-const exports = require('./routes/exports');
+const exportRoutes = require('./routes/exports');
 const logger = require('./utils/logger');
 
 const app = express();
@@ -19,7 +19,7 @@ app.get('/health', (req, res) => {
 });
 
 // Export routes
-app.use('/exports', exports);
+app.use('/exports', exportRoutes);
 
 // 404 handler
 app.use((req, res) => {
