@@ -1,0 +1,62 @@
+version: "3.8"
+
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: csv_export_db
+    environment:
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./seeds/init.sql:/docker-entrypoint-initdb.d/01-init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${DB_USER} -d $${DB_NAME}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - csv_export_network
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: csv_export_app
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      API_PORT: ${API_PORT}
+      DB_HOST: ${DB_HOST}
+      DB_PORT: ${DB_PORT}
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_NAME: ${DB_NAME}
+      DATABASE_URL: ${DATABASE_URL}
+      EXPORT_STORAGE_PATH: ${EXPORT_STORAGE_PATH}
+      NODE_ENV: production
+    ports:
+      - "${API_PORT}:${API_PORT}"
+    volumes:
+      - ./src:/app/src
+      - ./seeds:/app/seeds
+      - csv_exports:/app/exports
+    deploy:
+      resources:
+        limits:
+          memory: 150m
+    networks:
+      - csv_export_network
+    command: sh -c "node seeds/seed.js && node src/index.js"
+
+volumes:
+  postgres_data:
+  csv_exports:
+
+networks:
+  csv_export_network:
+    driver: bridge
