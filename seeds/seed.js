@@ -31,10 +31,15 @@ async function seed() {
     const countResult = await client.query('SELECT COUNT(*) FROM users');
     const existingCount = parseInt(countResult.rows[0].count);
 
-    if (existingCount > 0) {
-      console.log(`Database already contains ${existingCount} users. Skipping seed.`);
+    if (existingCount >= TOTAL_ROWS) {
+      console.log(`Database already contains ${existingCount.toLocaleString()} users. Skipping seed.`);
       await client.end();
       return;
+    }
+
+    if (existingCount > 0) {
+      console.log(`Database contains ${existingCount.toLocaleString()} users. Truncating table...`);
+      await client.query('TRUNCATE TABLE users RESTART IDENTITY CASCADE');
     }
 
     console.log(`Seeding ${TOTAL_ROWS.toLocaleString()} rows...`);
@@ -43,16 +48,16 @@ async function seed() {
     const seedQuery = `
       INSERT INTO users (name, email, signup_date, country_code, subscription_tier, lifetime_value)
       SELECT
-        'User ' || num,
-        'user' || num || '@example.com',
+        'User ' || num::TEXT,
+        'user' || num::TEXT || '@example.com',
         CURRENT_TIMESTAMP - (RANDOM() * INTERVAL '365 days'),
-        $1[((num - 1) % array_length($1, 1)) + 1],
-        $2[((num - 1) % array_length($2, 1)) + 1],
+        (ARRAY['US', 'UK', 'CA', 'AU', 'DE', 'FR', 'JP', 'IN', 'BR', 'MX'])[(num % 10) + 1],
+        (ARRAY['free', 'basic', 'premium', 'enterprise'])[(num % 4) + 1],
         ROUND((RANDOM() * 10000)::NUMERIC, 2)
-      FROM generate_series(1, $3) AS gs(num)
+      FROM generate_series(1, $1) AS gs(num)
     `;
 
-    await client.query(seedQuery, [COUNTRIES, TIERS, TOTAL_ROWS]);
+    await client.query(seedQuery, [TOTAL_ROWS]);
     
     console.log(`✓ Successfully inserted ${TOTAL_ROWS.toLocaleString()} rows`);
 
