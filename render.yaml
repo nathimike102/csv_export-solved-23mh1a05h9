@@ -2,7 +2,8 @@ services:
   - type: web
     name: csv-export-service
     runtime: node
-    plan: standard
+    plan: starter
+    buildCommand: npm ci --only=production
     startCommand: npm start
     envVars:
       - key: API_PORT
@@ -20,7 +21,8 @@ services:
           name: csv-export-db
           property: connectionString
 
-  - type: pserv
-    name: csv-export-db
-    runtime: postgres15
-    plan: standard
+databases:
+  - name: csv-export-db
+    plan: starter
+    databaseName: exports_db
+    user: exporter
