@@ -1,0 +1,11 @@
+node_modules
+.env
+.git
+*.log
+exports/
+seeds/
+docker-compose.yml
+Dockerfile
+fly.toml
+render.yaml
+QUICK_START.md
