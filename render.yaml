@@ -24,4 +24,3 @@ services:
     name: csv-export-db
     runtime: postgres15
     plan: standard
-    ipAllowList: []
