@@ -1,0 +1,35 @@
+app = "csv_export"
+primary_region = "sin"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  API_PORT = "8080"
+  EXPORT_STORAGE_PATH = "/app/exports"
+  NODE_ENV = "production"
+  BATCH_SIZE = "1000"
+  CHUNK_SIZE = "65536"
+
+[[mounts]]
+  source = "exports_data"
+  destination = "/app/exports"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = "off"
+  auto_start_machines = true
+  min_machines_running = 1
+
+  [http_service.concurrency]
+    type = "requests"
+    soft_limit = 50
+    hard_limit = 100
+
+  [[http_service.checks]]
+    interval = "10s"
+    timeout = "2s"
+    grace_period = "10s"
+    method = "GET"
+    path = "/health"

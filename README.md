@@ -53,6 +53,7 @@ docker-compose ps
 ```
 
 That's it! The single `docker-compose up --build -d` command will:
+
 - Build the Node.js application container
 - Start PostgreSQL 15
 - Seed 10 million users automatically
@@ -62,11 +63,13 @@ That's it! The single `docker-compose up --build -d` command will:
 ## API Endpoints
 
 ### 1. Initiate Export
+
 **POST** `/exports/csv`
 
 Start an export job asynchronously.
 
 **Query Parameters** (all optional):
+
 - `country_code` - Filter by country (e.g., `US`, `UK`)
 - `subscription_tier` - Filter by tier (`free`, `basic`, `premium`, `enterprise`)
 - `min_ltv` - Minimum lifetime value (e.g., `100.50`)
@@ -75,6 +78,7 @@ Start an export job asynchronously.
 - `quoteChar` - Quote character (default: `"`)
 
 **Response (202 Accepted)**:
+
 ```json
 {
   "exportId": "550e8400-e29b-41d4-a716-446655440000",
@@ -83,6 +87,7 @@ Start an export job asynchronously.
 ```
 
 **Examples**:
+
 ```bash
 # Basic export
 curl -X POST http://localhost:8080/exports/csv
@@ -95,11 +100,13 @@ curl -X POST "http://localhost:8080/exports/csv?columns=id,email&delimiter=|"
 ```
 
 ### 2. Check Status
+
 **GET** `/exports/{exportId}/status`
 
 Poll export progress.
 
 **Response (200 OK)**:
+
 ```json
 {
   "exportId": "550e8400-e29b-41d4-a716-446655440000",
@@ -116,6 +123,7 @@ Poll export progress.
 ```
 
 **Possible Status Values**:
+
 - `pending` - Queued
 - `processing` - Currently exporting
 - `completed` - Finished successfully
@@ -123,20 +131,24 @@ Poll export progress.
 - `cancelled` - User cancellation
 
 ### 3. Download File
+
 **GET** `/exports/{exportId}/download`
 
 Download completed CSV file with Range request & gzip support.
 
 **Response Headers**:
+
 - `Content-Type: text/csv`
 - `Accept-Ranges: bytes` (resumable downloads)
 - `Content-Encoding: gzip` (if requested)
 
 **Conditions**:
+
 - Export status must be `completed`
 - Returns `425 Too Early` if not finished
 
 **Examples**:
+
 ```bash
 # Full download
 curl http://localhost:8080/exports/\{exportId\}/download -o export.csv
@@ -152,26 +164,31 @@ curl --limit-rate 50k http://localhost:8080/exports/\{exportId\}/download
 ```
 
 ### 4. Cancel Export
+
 **DELETE** `/exports/{exportId}`
 
 Cancel in-progress export and cleanup files.
 
 **Response (204 No Content)**:
+
 ```
 [Empty body]
 ```
 
 **Example**:
+
 ```bash
 curl -X DELETE http://localhost:8080/exports/\{exportId\}
 ```
 
 ### 5. Health Check
+
 **GET** `/health`
 
 Health check for monitoring and orchestration.
 
 **Response (200 OK)**:
+
 ```json
 { "status": "ok" }
 ```
@@ -192,12 +209,12 @@ while true; do
   STATUS=$(curl -s "http://localhost:8080/exports/$EXPORT_ID/status")
   PERCENT=$(echo $STATUS | jq '.progress.percentage')
   STATE=$(echo $STATUS | jq -r '.status')
-  
+
   echo "Status: $STATE, Progress: $PERCENT%"
-  
+
   [[ "$STATE" == "completed" ]] && break
   [[ "$STATE" == "failed" ]] && { echo "Export failed!"; exit 1; }
-  
+
   sleep 2
 done
 
@@ -264,16 +281,19 @@ LOG_LEVEL=info             # Logging level
 ## Performance Characteristics
 
 ### Memory Usage
+
 - **During Export**: ~50-100MB (constant, regardless of dataset size)
 - **Without Streaming**: ~8GB+ would be needed for 10M rows (crashes)
 - **With Backpressure**: Prevents memory growth during slow clients
 
 ### Database Efficiency
+
 - **Cursor Fetching**: O(1) memory for any dataset size
 - **Indexes**: Optimized for country_code, subscription_tier, lifetime_value
 - **Concurrent Queries**: Handles 5+ concurrent exports
 
 ### Throughput
+
 - **Uncompressed**: 100K-500K rows/second
 - **Compressed**: 50K-200K rows/second
 - **Full 10M Export**: 5-30 seconds depending on filters
@@ -283,6 +303,7 @@ LOG_LEVEL=info             # Logging level
 ### Database Cursors for Memory Efficiency
 
 Uses PostgreSQL cursors to fetch small batches:
+
 ```sql
 DECLARE export_cursor CURSOR FOR SELECT * FROM users WHERE ...
 FETCH 1000 FROM export_cursor  -- Only loads 1000 rows at a time
@@ -293,10 +314,11 @@ Enables exporting 10M+ rows on <150MB RAM container.
 ### Backpressure Handling
 
 Stream write() returns false when buffer is full:
+
 ```javascript
 const canContinue = csvStringifier.write(record);
 if (!canContinue) {
-  await new Promise(resolve => csvStringifier.once('drain', resolve));
+  await new Promise((resolve) => csvStringifier.once("drain", resolve));
 }
 ```
 
@@ -438,13 +460,13 @@ rm -rf $(readlink .env.example | xargs dirname)/exports/*
 
 ## Architecture Decisions
 
-| Decision | Reason |
-|----------|--------|
-| **PostgreSQL Cursors** | O(1) memory vs LIMIT/OFFSET which becomes O(n) slow |
-| **Node.js Streams** | Native backpressure handling automatically |
-| **In-Memory Job Queue** | Sufficient for this scope; Redis for production |
-| **UUID Export IDs** | Non-guessable; prevents URL enumeration |
-| **Docker Compose** | Single-command startup meets requirements |
+| Decision                | Reason                                              |
+| ----------------------- | --------------------------------------------------- |
+| **PostgreSQL Cursors**  | O(1) memory vs LIMIT/OFFSET which becomes O(n) slow |
+| **Node.js Streams**     | Native backpressure handling automatically          |
+| **In-Memory Job Queue** | Sufficient for this scope; Redis for production     |
+| **UUID Export IDs**     | Non-guessable; prevents URL enumeration             |
+| **Docker Compose**      | Single-command startup meets requirements           |
 
 ## Production Considerations
 
@@ -466,6 +488,7 @@ MIT
 ## Support
 
 For issues, check logs:
+
 ```bash
 docker-compose logs app
 docker-compose logs db
